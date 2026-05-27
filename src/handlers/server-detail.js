@@ -517,7 +517,9 @@ export async function handleServerDetail(request, env, sys, viewId) {
       <div class="time-selector" id="time-selector">
         <button class="time-btn" data-hours="0.167">10m</button>
         <button class="time-btn active" data-hours="4">4h</button>
+        <button class="time-btn" data-hours="12">12h</button>
         <button class="time-btn" data-hours="24">1d</button>
+        <button class="time-btn" data-hours="72">3d</button>
         <button class="time-btn" data-hours="168">7d</button>
       </div>
     </div>

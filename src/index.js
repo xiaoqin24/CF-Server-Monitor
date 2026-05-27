@@ -14,8 +14,12 @@ function downsampleData(data, hours) {
   let intervalMs;
   if (hours <= 4) {
     return data;
+  } else if (hours <= 12) {
+    intervalMs = 2 * 60 * 1000;
   } else if (hours <= 24) {
     intervalMs = 5 * 60 * 1000;
+  } else if (hours <= 72) {
+    intervalMs = 15 * 60 * 1000;
   } else {
     intervalMs = 30 * 60 * 1000;
   }
