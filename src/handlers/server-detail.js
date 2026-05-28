@@ -1131,18 +1131,74 @@ export async function handleServerDetail(request, env, sys, viewId) {
       chart.update('none');
     }
     
+    function calculateAvgInterval(data) {
+      if (!data || data.length < 2) return 60000;
+      
+      let total = 0;
+      let count = 0;
+      
+      for (let i = 1; i < data.length; i++) {
+        const diff = Number(data[i].timestamp) - Number(data[i - 1].timestamp);
+        if (diff > 0) {
+          total += diff;
+          count++;
+        }
+      }
+      
+      return count > 0 ? total / count : 60000;
+    }
+    
+    function sampleDataByInterval(data, targetInterval) {
+      if (!data || data.length <= 1) return data;
+      
+      const result = [];
+      let lastTs = -Infinity;
+      
+      for (const item of data) {
+        const ts = Number(item.timestamp);
+        if (ts - lastTs >= targetInterval) {
+          result.push(item);
+          lastTs = ts;
+        }
+      }
+      
+      return result;
+    }
+    
     function mergeDataSets(rawData, aggData) {
       if (!rawData || rawData.length === 0) return aggData || [];
       if (!aggData || aggData.length === 0) return rawData;
       
+      const oneHourAgo = Date.now() - ONE_HOUR_MS;
+      
+      const sortedRaw = [...rawData].sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+      const sortedAgg = [...aggData].sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+      
+      const recentRaw = sortedRaw.filter(d => Number(d.timestamp) >= oneHourAgo);
+      const olderRaw = sortedRaw.filter(d => Number(d.timestamp) < oneHourAgo);
+      
+      const aggInterval = calculateAvgInterval(sortedAgg);
+      const rawInterval = calculateAvgInterval(recentRaw);
+      
+      let processedRaw = recentRaw;
+      if (aggInterval > rawInterval * 1.5 && recentRaw.length > 10) {
+        const targetInterval = Math.max(aggInterval * 0.8, rawInterval * 2);
+        processedRaw = sampleDataByInterval(recentRaw, targetInterval);
+      }
+      
       const map = new Map();
       
-      for (const item of aggData) {
+      for (const item of olderRaw) {
         const ts = Number(item.timestamp);
         map.set(ts, item);
       }
       
-      for (const item of rawData) {
+      for (const item of sortedAgg) {
+        const ts = Number(item.timestamp);
+        map.set(ts, item);
+      }
+      
+      for (const item of processedRaw) {
         const ts = Number(item.timestamp);
         map.set(ts, item);
       }
