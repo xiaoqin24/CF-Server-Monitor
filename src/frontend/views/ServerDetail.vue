@@ -75,7 +75,7 @@
         </div>
         <div class="sysinfo-item">
           <span class="sysinfo-label">🕐 {{ trans.bootTime }}</span>
-          <span class="sysinfo-value sysinfo-small">{{ formatBootTime(server.boot_time) }}</span>
+          <span class="sysinfo-value sysinfo-small">{{ formatTimestamp(server.boot_time) }}</span>
         </div>
         <div class="sysinfo-item">
           <span class="sysinfo-label">⏰ {{ trans.lastUpdate }}</span>
@@ -379,7 +379,7 @@ const formatUptime = (bootTime) => {
   }
 }
 
-const formatBootTime = (bootTime) => {
+const formatTimestamp = (bootTime) => {
   const bootTimeMs = parseBootTimeToMs(bootTime)
   if (!bootTimeMs) return 'N/A'
   
@@ -797,7 +797,6 @@ const loadAllHistory = async (hours) => {
         chart.update('none')
       })
     })
-    const now = new Date(); lastUpdateText.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
   } catch (e) {
     console.error('[ERROR] Load history failed:', e)
   }
@@ -924,7 +923,7 @@ const fetchCurrentStatus = async (incomingData) => {
       charts.load.update('none')
     }
 
-    const now = new Date(); lastUpdateText.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
+    lastUpdateText.value = formatTimestamp(data.last_updated)
   } catch (e) {
     console.error('[ERROR] Update status failed:', e)
   }

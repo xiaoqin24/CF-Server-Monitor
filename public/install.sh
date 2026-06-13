@@ -437,8 +437,31 @@ while true; do
     CPU_CORES=$(nproc 2>/dev/null || grep -c '^processor' /proc/cpuinfo 2>/dev/null || echo "1")
     LOAD_AVG=$(cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}' || echo "0 0 0")
     PROCESSES=$(ps -e 2>/dev/null | wc -l || echo 0)
-    TCP_CONN=$(ss -ant 2>/dev/null | grep -c -v State || wc -l < /proc/net/tcp 2>/dev/null || echo 0)
-    UDP_CONN=$(ss -anu 2>/dev/null | grep -c -v State || wc -l < /proc/net/udp 2>/dev/null || echo 0)
+
+    # ---------------- TCP ----------------
+    TCP_CONN=""
+
+    if command -v ss >/dev/null 2>&1; then
+        # 只统计真正“活跃连接”
+        TCP_CONN=$(ss -H -ant state established 2>/dev/null | wc -l)
+    else
+        # /proc fallback：只算 ESTABLISHED (st=01)
+        TCP_CONN=$(awk 'NR>1 && $4=="01"{c++} END{print c+0}' /proc/net/tcp 2>/dev/null)
+    fi
+
+    TCP_CONN=$(printf "%s" "${TCP_CONN:-0}" | tr -d '\r\n ')
+
+
+    # ---------------- UDP ----------------
+    UDP_CONN=""
+
+    if command -v ss >/dev/null 2>&1; then
+        UDP_CONN=$(ss -H -anu 2>/dev/null | wc -l)
+    else
+        UDP_CONN=$(awk 'NR>1{c++} END{print c+0}' /proc/net/udp 2>/dev/null)
+    fi
+
+    UDP_CONN=$(printf "%s" "${UDP_CONN:-0}" | tr -d '\r\n ')
 
     # ------------------ 精确无干扰时钟网速算法 ------------------
     NET_STAT=$(get_net_bytes)
