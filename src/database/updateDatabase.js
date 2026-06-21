@@ -78,7 +78,6 @@ async function addServerColumns(db) {
     const existingCols = columns.map(c => c.name);
     
     const newCols = {
-      country: "TEXT DEFAULT ''",
       is_hidden: "TEXT DEFAULT '0'",
       sort_order: "INTEGER DEFAULT 0",
       reset_day: "INTEGER DEFAULT 1",

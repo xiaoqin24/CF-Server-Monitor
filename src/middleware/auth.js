@@ -1,13 +1,5 @@
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' };
-
-async function md5Hash(input) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hash = await crypto.subtle.digest('MD5', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+import { md5Hash } from '../utils/common.js';
 
 async function generateKeyFromSecret(secret) {
   const encoder = new TextEncoder();

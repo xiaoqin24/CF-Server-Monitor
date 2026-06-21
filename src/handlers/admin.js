@@ -4,40 +4,8 @@ import { getAllServers } from '../utils/cache.js';
 import { clearServersListCache, clearServerDetailCache } from '../utils/cache.js';
 import { clearSiteSettingsCache } from '../utils/settings.js';
 import { mergeMetricsIntoServer } from '../utils/metrics.js';
-
-async function md5Hash(input) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hash = await crypto.subtle.digest('MD5', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-async function verifyTurnstileToken(token, secretKey) {
-  if (!token || !secretKey) {
-    return false;
-  }
-  
-  try {
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        secret: secretKey,
-        response: token
-      })
-    });
-    
-    const data = await response.json();
-    return data.success === true;
-  } catch (e) {
-    console.error('Turnstile verification error:', e);
-    return false;
-  }
-}
+import { verifyTurnstileToken, md5Hash } from '../utils/common.js';
+import { AppError, createSuccessResponse, createBadRequestResponse, createUnauthorizedResponse, createErrorResponse } from '../utils/errors.js';
 
 function isValidUUID(id) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -181,10 +149,7 @@ export async function handleAdminAPI(request, env, sys) {
       const { username, password } = data;
       
       if (!username || !password) {
-        return new Response(JSON.stringify({ error: 'Missing username or password' }), { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createBadRequestResponse('Missing username or password');
       }
 
       const turnstileEnabled = sys && (sys.turnstile_enabled === 'true' || sys.turnstile_enabled === true);
@@ -195,10 +160,7 @@ export async function handleAdminAPI(request, env, sys) {
         const isTurnstileVerified = await verifyTurnstileToken(turnstileToken, turnstileSecretKey);
         
         if (!isTurnstileVerified) {
-          return new Response(JSON.stringify({ error: 'Turnstile verification failed' }), { 
-            status: 403,
-            headers: { 'Content-Type': 'application/json' }
-          });
+          return createErrorResponse(new AppError('Turnstile verification failed', 403));
         }
       }
 
@@ -212,29 +174,21 @@ export async function handleAdminAPI(request, env, sys) {
       const isValid = await validateCredentials(mockRequest, env, sys);
       
       if (!isValid) {
-        return new Response(JSON.stringify({ error: 'Invalid username or password' }), { 
-          status: 401,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createUnauthorizedResponse('Invalid username or password');
       }
 
       try {
         const token = await generateToken(env, sys);
-        return new Response(JSON.stringify({ 
+        return createSuccessResponse({ 
           success: true, 
           token: token,
           message: {
             en: 'Login successful',
             zh: '登录成功'
           }
-        }), {
-          headers: { 'Content-Type': 'application/json' }
         });
       } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), { 
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createErrorResponse(e);
       }
     }
 
@@ -243,12 +197,10 @@ export async function handleAdminAPI(request, env, sys) {
     }
 
     if (data.action === 'get_settings') {
-      return new Response(JSON.stringify({
+      return createSuccessResponse({
         success: true,
         settings: sys,
         api_secret: env.API_SECRET
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     }
     else if (data.action === 'list') {
@@ -314,28 +266,21 @@ export async function handleAdminAPI(request, env, sys) {
         stats.avg_disk = (stats.total_disk / stats.online).toFixed(2);
       }
 
-      return new Response(JSON.stringify({
+      return createSuccessResponse({
         success: true,
         servers: serversWithStatus,
         stats
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     }
     else if (data.action === 'd1_usage') {
       try {
         const usage = await getD1DailyUsage(sys.cloudflare_token || '', sys.cloudflare_account_id || '');
-        return new Response(JSON.stringify({
+        return createSuccessResponse({
           success: true,
           usage
-        }), {
-          headers: { 'Content-Type': 'application/json' }
         });
       } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createBadRequestResponse(e.message);
       }
     }
     else if (data.action === 'save_settings') {
@@ -378,23 +323,18 @@ export async function handleAdminAPI(request, env, sys) {
       Object.assign(sys, appearanceOptions, siteOptions);
 
       clearSiteSettingsCache();
-      return new Response(JSON.stringify({ 
+      return createSuccessResponse({ 
         success: true, 
         message: {
           en: 'Update Success',
           zh: '更新成功'
         }
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     } 
     else if (data.action === 'add') {
       const name = data.name || 'New Server';
       if (!isValidName(name)) {
-        return new Response(JSON.stringify({ error: '服务器名称无效' }), { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createBadRequestResponse('服务器名称无效');
       }
       
       const id = crypto.randomUUID();
@@ -411,24 +351,19 @@ export async function handleAdminAPI(request, env, sys) {
       
       clearServersListCache();
       
-      return new Response(JSON.stringify({ 
+      return createSuccessResponse({ 
         success: true, 
         id: id,
         message: {
           en: `Server "${name}" added`,
           zh: `服务器 "${name}" 已添加`
         }
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     } 
     else if (data.action === 'delete') {
       const { id } = data;
       if (!id || !isValidUUID(id)) {
-        return new Response(JSON.stringify({ error: '服务器 ID 无效' }), { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createBadRequestResponse('服务器 ID 无效');
       }
       
       await env.DB.prepare('DELETE FROM metrics_history WHERE server_id = ?').bind(id).run();
@@ -437,54 +372,41 @@ export async function handleAdminAPI(request, env, sys) {
       clearServersListCache();
       clearServerDetailCache(id);
       
-      return new Response(JSON.stringify({ 
+      return createSuccessResponse({ 
         success: true, 
         message: {
           en: 'Server deleted',
           zh: '服务器已删除'
         }
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     } 
     else if (data.action === 'save_order') {
       const { orders } = data;
       if (!orders || !Array.isArray(orders) || orders.length === 0) {
-        return new Response(JSON.stringify({ error: '缺少排序数据' }), { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createBadRequestResponse('缺少排序数据');
       }
       
       for (let i = 0; i < orders.length; i++) {
         if (!isValidUUID(orders[i])) {
-          return new Response(JSON.stringify({ error: '排序数据包含无效 ID' }), { 
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
+          return createBadRequestResponse('排序数据包含无效 ID');
         }
         await env.DB.prepare('UPDATE servers SET sort_order = ? WHERE id = ?').bind(i, orders[i]).run();
       }
       
       clearServersListCache();
       
-      return new Response(JSON.stringify({ 
+      return createSuccessResponse({ 
         success: true, 
         message: {
           en: 'Sort order saved',
           zh: '排序已保存'
         }
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     }
     else if (data.action === 'edit') {
       const { id, name, server_group, price, expire_date, bandwidth, traffic_limit, traffic_calc_type, reset_day, report_interval, ping_mode, is_hidden } = data;
       if (!id || !isValidUUID(id)) {
-        return new Response(JSON.stringify({ error: '服务器 ID 无效' }), { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createBadRequestResponse('服务器 ID 无效');
       }
       
       try {
@@ -528,45 +450,29 @@ export async function handleAdminAPI(request, env, sys) {
         }
       } catch (e) {
         console.error('Edit server error:', e);
-        return new Response(JSON.stringify({ 
-          error: {
-            en: 'Update failed. Please go to Database Management and click "Upgrade Database" to migrate the new field.',
-            zh: '更新失败，请到数据库管理中点击"升级数据库"以迁移新字段。'
-          }
-        }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createErrorResponse(new Error('Update failed. Please go to Database Management and click "Upgrade Database" to migrate the new field.'));
       }
       
       clearServersListCache();
       clearServerDetailCache(id);
       
-      return new Response(JSON.stringify({ 
+      return createSuccessResponse({ 
         success: true, 
         message: {
           en: 'Server updated',
           zh: '服务器信息已更新'
         }
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     }
     else if (data.action === 'batch_delete') {
       const { ids } = data;
       if (!ids || !Array.isArray(ids) || ids.length === 0) {
-        return new Response(JSON.stringify({ error: '请选择要删除的服务器' }), { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return createBadRequestResponse('请选择要删除的服务器');
       }
       
       for (const id of ids) {
         if (!isValidUUID(id)) {
-          return new Response(JSON.stringify({ error: '包含无效的服务器 ID' }), { 
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
+          return createBadRequestResponse('包含无效的服务器 ID');
         }
       }
       
@@ -579,27 +485,19 @@ export async function handleAdminAPI(request, env, sys) {
         clearServerDetailCache(id);
       }
       
-      return new Response(JSON.stringify({ 
+      return createSuccessResponse({ 
         success: true, 
         message: {
           en: `${ids.length} server(s) deleted`,
           zh: `已删除 ${ids.length} 台服务器`
         }
-      }), {
-        headers: { 'Content-Type': 'application/json' }
       });
     }
     
-    return new Response(JSON.stringify({ error: '未知操作' }), { 
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return createBadRequestResponse('未知操作');
     
   } catch (e) {
     console.error('Admin API 错误:', e);
-    return new Response(JSON.stringify({ error: e.message }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return createErrorResponse(e);
   }
 }

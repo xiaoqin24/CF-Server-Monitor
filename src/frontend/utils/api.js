@@ -197,7 +197,7 @@ export const fetchConfig = async () => {
 }
 
 export const upgradeDatabase = async () => {
-  const result = await http.get('/updateDatabase')
+  const result = await http.post('/updateDatabase')
   if (result.error) {
     if (result.status === 401) {
       return { success: false, error: 'Unauthorized' }
@@ -208,7 +208,7 @@ export const upgradeDatabase = async () => {
 }
 
 export const rebuildDatabase = async () => {
-  const result = await http.get('/rebuild')
+  const result = await http.post('/rebuild')
   if (result.error) {
     if (result.status === 401) {
       return { success: false, error: 'Unauthorized' }

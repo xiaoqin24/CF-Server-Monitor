@@ -8,7 +8,8 @@ import { handleServerAPI, handleServersAPI } from './handlers/dashboard.js';
 import { loadSettings, loadSiteSettings } from './utils/settings.js';
 import { checkAuth, simpleAuthResponse } from './middleware/auth.js';
 import { getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache, getCacheDuration } from './utils/cache.js';
-import { createSuccessResponse, createUnauthorizedResponse, createBadRequestResponse } from './utils/errors.js';
+import { AppError, createSuccessResponse, createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse, createErrorResponse } from './utils/errors.js';
+import { verifyTurnstileToken } from './utils/common.js';
 
 // Durable Objects: 实时指标广播
 // 显式 import + extends，确保 wrangler 静态分析器能在入口文件直接识别此 DO 类
@@ -76,31 +77,6 @@ async function isTurnstileCookieValid(request, env) {
   return decrypted && decrypted.expires && Date.now() < decrypted.expires * 1000;
 }
 
-async function verifyTurnstileToken(token, secretKey) {
-  if (!token || !secretKey) {
-    return false;
-  }
-  
-  try {
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        secret: secretKey,
-        response: token
-      })
-    });
-    
-    const data = await response.json();
-    return data.success === true;
-  } catch (e) {
-    console.error('Turnstile verification error:', e);
-    return false;
-  }
-}
-
 async function fetchHistoryData(env, request, id, hours, columns, sys = null) {
   if (!id) return createBadRequestResponse('Missing ID');
   
@@ -118,7 +94,7 @@ async function fetchHistoryData(env, request, id, hours, columns, sys = null) {
   }
   
   const server = await getServerDetail(env.DB, id, isLoggedIn);
-  if (!server) return new Response('Not Found', { status: 404 });
+  if (!server) return createNotFoundResponse();
   
   // 最多查询7天数据
   const clampedHours = Math.min(hours, 168);
@@ -197,10 +173,7 @@ export default {
           const isVerified = await verifyTurnstileToken(turnstileToken, turnstileSecretKey);
           
           if (!isVerified) {
-            return new Response(JSON.stringify({ error: 'Turnstile verification failed', code: 403 }), {
-              status: 403,
-              headers: { 'Content-Type': 'application/json' }
-            });
+            return createErrorResponse(new AppError('Turnstile verification failed', 403));
           }
           
           setTurnstileCookie = true;
@@ -264,7 +237,7 @@ export default {
         await ensureFullSettings();
         return handleAdminAPI(request, env, sys);
       }},
-      { method: 'GET', path: '/updateDatabase', handler: async () => {
+      { method: 'POST', path: '/updateDatabase', handler: async () => {
         await ensureFullSettings();
         if (!await checkAuth(request, env, sys)) {
           return simpleAuthResponse();
@@ -272,7 +245,7 @@ export default {
         const result = await updateDatabase(env.DB);
         return createSuccessResponse(result);
       }},
-      { method: 'GET', path: '/rebuild', handler: async () => {
+      { method: 'POST', path: '/rebuild', handler: async () => {
         await ensureFullSettings();
         if (!await checkAuth(request, env, sys)) {
           return simpleAuthResponse();
