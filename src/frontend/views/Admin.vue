@@ -273,7 +273,7 @@
                   <div class="form-group flex-1">
                     <label class="form-label">{{ trans.telegramToken }}</label>
                     <div class="password-input-wrapper">
-                      <input :type="passwordVisible.tgBotToken ? 'text' : 'password'" name="tg_bot_token" autocomplete="off" v-model="settings.tg_bot_token" class="form-input" placeholder="Bot Token or Webhook URL">
+                      <input :type="passwordVisible.tgBotToken ? 'text' : 'password'" name="tg_bot_token" v-model="settings.tg_bot_token" class="form-input" placeholder="Bot Token or Webhook URL">
                       <button type="button" class="password-toggle" @click="togglePassword('tgBotToken')">
                         {{ passwordVisible.tgBotToken ? '🙈' : '👁️' }}
                       </button>
