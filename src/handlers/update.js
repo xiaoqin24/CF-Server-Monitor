@@ -1,53 +1,18 @@
 import { saveMetricsHistory } from '../database/schema.js';
 import { checkServerExists } from '../utils/cache.js';
+import { mergeMetricsIntoServer } from '../utils/metrics.js';
 import { createErrorResponse, createUnauthorizedResponse, createNotFoundResponse } from '../utils/errors.js';
 
 // 将最新一次上报打包成前端可直接消费的 "当前状态" 对象
 // 与 /api/server 和 /api/servers 返回的字段保持一致，便于页面直接合并
 function buildPayloadForBroadcast(id, metrics, extra = {}) {
-  const ts = metrics.timestamp || Date.now();
-  return {
-    id,
-    cpu: metrics.cpu ?? null,
-    ram: metrics.ram ?? null,
-    disk: metrics.disk ?? null,
-    load_avg: metrics.load ?? metrics.load_avg ?? '0 0 0',
-    net_in_speed: metrics.net_in_speed ?? null,
-    net_out_speed: metrics.net_out_speed ?? null,
-    net_rx: metrics.net_rx ?? null,
-    net_tx: metrics.net_tx ?? null,
-    net_rx_monthly: metrics.net_rx_monthly ?? null,
-    net_tx_monthly: metrics.net_tx_monthly ?? null,
-    processes: metrics.processes ?? null,
-    tcp_conn: metrics.tcp_conn ?? null,
-    udp_conn: metrics.udp_conn ?? null,
-    ping_ct: metrics.ping_ct ?? null,
-    ping_cu: metrics.ping_cu ?? null,
-    ping_cm: metrics.ping_cm ?? null,
-    ping_bd: metrics.ping_bd ?? null,
-    loss_ct: metrics.loss_ct ?? null,
-    loss_cu: metrics.loss_cu ?? null,
-    loss_cm: metrics.loss_cm ?? null,
-    loss_bd: metrics.loss_bd ?? null,
-    ram_total: metrics.ram_total ?? null,
-    ram_used: metrics.ram_used ?? null,
-    swap_total: metrics.swap_total ?? null,
-    swap_used: metrics.swap_used ?? null,
-    disk_total: metrics.disk_total ?? null,
-    disk_used: metrics.disk_used ?? null,
-    cpu_cores: metrics.cpu_cores ?? null,
-    cpu_info: metrics.cpu_info ?? '',
-    gpu: metrics.gpu ?? null,
-    gpu_info: metrics.gpu_info ?? '',
-    arch: metrics.arch ?? '',
-    os: metrics.os ?? '',
-    country: metrics.country || extra.country || '',
-    ip_v4: metrics.ip_v4 ?? '0',
-    ip_v6: metrics.ip_v6 ?? '0',
-    boot_time: metrics.boot_time ?? '',
-    last_updated: ts,
-    timestamp: ts
-  };
+  const payload = {};
+  mergeMetricsIntoServer(payload, metrics);
+  payload.id = id;
+  payload.country = metrics.country || extra.country || '';
+  payload.last_updated = metrics.timestamp || Date.now();
+  payload.timestamp = payload.last_updated;
+  return payload;
 }
 
 // 内部辅助：向 Durable Object 发送广播

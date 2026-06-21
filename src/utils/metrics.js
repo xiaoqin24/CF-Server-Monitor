@@ -4,7 +4,7 @@ export function mergeMetricsIntoServer(server, metrics) {
   server.cpu = metrics.cpu || 0;
   server.ram = metrics.ram || 0;
   server.disk = metrics.disk || 0;
-  server.load_avg = metrics.load ?? metrics.load_avg ?? '0';
+  server.load_avg = metrics.load ?? metrics.load_avg ?? '0 0 0';
   server.net_in_speed = metrics.net_in_speed || 0;
   server.net_out_speed = metrics.net_out_speed || 0;
   server.net_rx = metrics.net_rx || 0;

@@ -5,12 +5,11 @@ import { handleAdminAPI } from './handlers/admin.js';
 import { serveFrontend } from './handlers/frontend.js';
 import { handleUpdate, handleWebSocketUpgrade } from './handlers/update.js';
 import { handleServerAPI, handleServersAPI } from './handlers/dashboard.js';
-import { loadSettings, loadSiteSettings } from './utils/settings.js';
+import { loadSettings, loadSiteSettings, setDebug } from './utils/settings.js';
 import { checkAuth, simpleAuthResponse } from './middleware/auth.js';
 import { getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache, getCacheDuration } from './utils/cache.js';
 import { AppError, createSuccessResponse, createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse, createErrorResponse } from './utils/errors.js';
 import { verifyTurnstileToken } from './utils/common.js';
-
 // Durable Objects: 实时指标广播
 // 显式 import + extends，确保 wrangler 静态分析器能在入口文件直接识别此 DO 类
 import { MetricsBroadcaster as _MetricsBroadcaster }
@@ -129,6 +128,9 @@ async function fetchHistoryData(env, request, id, hours, columns, sys = null) {
 
 export default {
   async fetch(request, env, ctx) {
+    const isLocalhost = new URL(request.url).hostname === 'localhost';
+    setDebug(env.DEBUG || (isLocalhost ? 1 : 0));
+
     const url = new URL(request.url);
     const method = request.method;
     const path = url.pathname;
@@ -284,24 +286,24 @@ export default {
 
   async scheduled(event, env, ctx) {
     const cron = event.cron;
-    console.log(`[Cron] 定时任务触发: ${cron}`);
+    console.debug(`[Cron] 定时任务触发: ${cron}`);
     
     if (cron === '* * 1 * *') {
-      console.log('[Cron] 开始执行每月数据清理任务（表轮换）');
+      console.debug('[Cron] 开始执行每月数据清理任务（表轮换）');
       await monthlyCleanup(env.DB);
-      console.log('[Cron] 每月数据清理任务完成');
+      console.debug('[Cron] 每月数据清理任务完成');
     } else if (cron === '* * 8 * *') {
-      console.log('[Cron] 开始执行每月8号清理旧表任务');
+      console.debug('[Cron] 开始执行每月8号清理旧表任务');
       await dropMetricsHistoryOld(env.DB);
-      console.log('[Cron] 每月8号清理旧表任务完成');
+      console.debug('[Cron] 每月8号清理旧表任务完成');
     } else if (cron === '*/1 * * * *') {
-      console.log('[Cron] 开始执行离线节点检测');
+      console.debug('[Cron] 开始执行离线节点检测');
       await checkOfflineNodes(env.DB);
-      console.log('[Cron] 离线节点检测完成');
+      console.debug('[Cron] 离线节点检测完成');
     } else if (cron === '0 12 * * *') {
-      console.log('[Cron] 开始执行服务器到期检测');
+      console.debug('[Cron] 开始执行服务器到期检测');
       await checkExpiringServers(env.DB);
-      console.log('[Cron] 服务器到期检测完成');
+      console.debug('[Cron] 服务器到期检测完成');
     }
   }
 };

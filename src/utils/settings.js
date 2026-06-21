@@ -44,10 +44,10 @@ let siteSettingsCacheExpiry = 0;
 export async function loadSiteSettings(db) {
   const now = Date.now();
   if (cachedSiteSettings && now < siteSettingsCacheExpiry) {
-    console.log('读取site settings缓存');
+    debug('读取site settings缓存');
     return cachedSiteSettings;
   }
-  console.log('从数据库加载site settings');
+  debug('从数据库加载site settings');
 
   const result = { ...defaults };
   let hasSite = false;
@@ -146,4 +146,16 @@ export async function loadSettings(db) {
   }
 
   return result;
+}
+
+let isDebugEnabled = false;
+
+export function setDebug(debug) {
+  isDebugEnabled = debug === 1 || debug === '1' || debug === true;
+}
+
+export function debug(...args) {
+  if (isDebugEnabled) {
+    console.debug('[DEBUG]', ...args);
+  }
 }

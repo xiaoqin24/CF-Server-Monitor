@@ -228,15 +228,16 @@ const filterOptions = computed(() => {
   return opts
 })
 
+const filteredServers = computed(() => {
+  if (currentFilter.value === 'all') return servers.value
+  if (currentFilter.value === 'unknown') return servers.value.filter(s => !s.country)
+  return servers.value.filter(s => (s.country || 'xx').toLowerCase() === currentFilter.value)
+})
+
 const groupedServers = computed(() => {
   const groups = {}
   const order = []
-  const filteredList = currentFilter.value === 'all'
-    ? servers.value
-    : currentFilter.value === 'unknown'
-      ? servers.value.filter(s => !s.country)
-      : servers.value.filter(s => (s.country || 'xx').toLowerCase() === currentFilter.value)
-  filteredList.forEach(server => {
+  filteredServers.value.forEach(server => {
     const groupName = server.server_group || 'Default'
     if (!groups[groupName]) {
       groups[groupName] = []
@@ -245,12 +246,6 @@ const groupedServers = computed(() => {
     groups[groupName].push(server)
   })
   return order.map(name => ({ name, servers: groups[name] }))
-})
-
-const filteredServers = computed(() => {
-  if (currentFilter.value === 'all') return servers.value
-  if (currentFilter.value === 'unknown') return servers.value.filter(s => !s.country)
-  return servers.value.filter(s => (s.country || 'xx').toLowerCase() === currentFilter.value)
 })
 
 const switchView = (viewName) => {
