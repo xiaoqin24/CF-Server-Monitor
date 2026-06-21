@@ -2,24 +2,37 @@
 
 一个基于 Cloudflare Workers + D1 + Durable Objects 的多服务器监控探针系统，支持实时监控、历史数据查看、延迟追踪、地图展示等功能。兼容主流Linux系统，Alpine Linux，OpenWrt，Windows系统。**演示地址**：<https://tz.dashdeep.dpdns.org/>
 
-注意：
+**当前版本：V2.7.3.2**
 
-- <= 2.6.9 版本,使用方式一部署方式，需要在Workers & Pages页面，点击 **Settings**，修改Build configuration的Deploy command为：`npx wrangler deploy --keep-vars`，否则会导致API\_SECRET丢失。旧key可用通过`cat /etc/systemd/system/cf-probe.service`或者`cat /etc/init.d/cf-probe`获取，再重新设置环境变量API\_SECRET（注意是设置顶部的变量和密钥），最后再同步数据。
+<2.7.1 需要**升级安装脚本** & **后台升级数据库** 才能生效，否则会产生数据库结构错误或者图表显示异常
+```
+# Linux
+curl -sL https://你的项目.你的子域.workers.dev/install.sh | bash -s install
+# Alpine
+curl -sL https://你的项目.你的子域.workers.dev/install-alpine.sh | sh -s install
+# OpenWrt
+curl -sL https://你的项目.你的子域.workers.dev/install-openwrt.sh | sh -s install
+```
+<= 2.6.9 版本,使用方式一部署方式，需要在Workers & Pages页面，点击 **Settings**，修改Build configuration的Deploy command为：`npx wrangler deploy --keep-vars`，否则会导致API\_SECRET丢失。旧key可用通过
+```
+# Linux
+cat /etc/systemd/system/cf-probe.service
+# OpenWrt,Alpine
+cat /etc/init.d/cf-probe
+# >2.6.9版本
+cat /etc/config/cf-probe/config.conf
+```
+获取，再重新设置环境变量API\_SECRET（注意是设置顶部的变量和密钥），最后再同步数据。
 
-**当前版本：V2.7.31**
 
-- V2.7.31 今天下午开始request.cf返回`cf object not available`错误，导致国家/地区代码获取失败，加入头获取cf国家代码作为备选
+<details>
+<summary>更新记录</summary>
+
+- V2.7.3.2
+- V2.7.3.1 当request.cf返回`cf object not available`错误，导致国家/地区代码获取失败，使用request.headers获取作为备选
 - V2.7.3 新增服务器到期提醒功能，调整后台设置页面布局
 - V2.7.2 新增支持多分区磁盘统计功能以及其他优化，增加[图文教程](https://huilang.me/cf-server-monitor-setup/)
 - V2.7.1 新增国内四线路丢包率监控与历史图表，新增GPU字段与图表展示（GPU暂未测试），后台新增 Cloudflare D1/Workers 每日额度查询功能；
-
-> 升级后请在后台点击 **升级数据库** 并重新安装/升级探针，否则新图表可能提示数据库结构未升级
->
-> Linux -> `curl -sL https://你的项目.你的子域.workers.dev/install.sh | bash -s install`
->
-> Alpine Linux -> `curl -sL https://你的项目.你的子域.workers.dev/install-alpine.sh | sh -s install`
->
-> OpenWrt -> `curl -sL https://你的项目.你的子域.workers.dev/install-openwrt.sh | sh -s install`
 
 - V2.7.0 将每日数据清理改为每月1号执行的表轮换任务, 删除旧表将不再扣除D1消耗,前端图表支持查看最长7天的历史数据,优化脚本一键升级功能
 - V2.6.10 修复了方式一部署方式，同步后丢失API\_SECRET的问题
@@ -33,6 +46,7 @@
 - V2.6.0 降低了 50% 的D1写入消耗，强烈建议升级，升级后请在后台手动点击 升级数据库 或者 重建数据库 。
 - V2.5.0 增加客户端上报数据后，在不占用D1消耗的情况下，前端WebSocket实时刷新数据
 - V2.4.0 版本主要优化了D1读写占用，使项目消耗大大降低，以及增加了防护避免被刷。
+</details>
 
 ## ✨ 功能特点
 
