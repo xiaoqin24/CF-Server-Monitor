@@ -5,11 +5,11 @@ import { handleAdminAPI } from './handlers/admin.js';
 import { serveFrontend } from './handlers/frontend.js';
 import { handleUpdate, handleWebSocketUpgrade } from './handlers/update.js';
 import { handleServerAPI, handleServersAPI } from './handlers/dashboard.js';
-import { loadSettings, loadSiteSettings } from './utils/settings.js';
+import { loadSettings, loadSiteSettings, setDebug } from './utils/settings.js';
 import { checkAuth, simpleAuthResponse } from './middleware/auth.js';
 import { getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache, getCacheDuration } from './utils/cache.js';
-import { createSuccessResponse, createUnauthorizedResponse, createBadRequestResponse } from './utils/errors.js';
-
+import { AppError, createSuccessResponse, createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse, createErrorResponse } from './utils/errors.js';
+import { verifyTurnstileToken } from './utils/common.js';
 // Durable Objects: 实时指标广播
 // 显式 import + extends，确保 wrangler 静态分析器能在入口文件直接识别此 DO 类
 import { MetricsBroadcaster as _MetricsBroadcaster }
@@ -76,31 +76,6 @@ async function isTurnstileCookieValid(request, env) {
   return decrypted && decrypted.expires && Date.now() < decrypted.expires * 1000;
 }
 
-async function verifyTurnstileToken(token, secretKey) {
-  if (!token || !secretKey) {
-    return false;
-  }
-  
-  try {
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        secret: secretKey,
-        response: token
-      })
-    });
-    
-    const data = await response.json();
-    return data.success === true;
-  } catch (e) {
-    console.error('Turnstile verification error:', e);
-    return false;
-  }
-}
-
 async function fetchHistoryData(env, request, id, hours, columns, sys = null) {
   if (!id) return createBadRequestResponse('Missing ID');
   
@@ -118,7 +93,7 @@ async function fetchHistoryData(env, request, id, hours, columns, sys = null) {
   }
   
   const server = await getServerDetail(env.DB, id, isLoggedIn);
-  if (!server) return new Response('Not Found', { status: 404 });
+  if (!server) return createNotFoundResponse();
   
   // 最多查询7天数据
   const clampedHours = Math.min(hours, 168);
@@ -153,6 +128,9 @@ async function fetchHistoryData(env, request, id, hours, columns, sys = null) {
 
 export default {
   async fetch(request, env, ctx) {
+    const isLocalhost = new URL(request.url).hostname === 'localhost';
+    setDebug(env.DEBUG || (isLocalhost ? 1 : 0));
+
     const url = new URL(request.url);
     const method = request.method;
     const path = url.pathname;
@@ -197,10 +175,7 @@ export default {
           const isVerified = await verifyTurnstileToken(turnstileToken, turnstileSecretKey);
           
           if (!isVerified) {
-            return new Response(JSON.stringify({ error: 'Turnstile verification failed', code: 403 }), {
-              status: 403,
-              headers: { 'Content-Type': 'application/json' }
-            });
+            return createErrorResponse(new AppError('Turnstile verification failed', 403));
           }
           
           setTurnstileCookie = true;
@@ -264,7 +239,7 @@ export default {
         await ensureFullSettings();
         return handleAdminAPI(request, env, sys);
       }},
-      { method: 'GET', path: '/updateDatabase', handler: async () => {
+      { method: 'POST', path: '/updateDatabase', handler: async () => {
         await ensureFullSettings();
         if (!await checkAuth(request, env, sys)) {
           return simpleAuthResponse();
@@ -272,7 +247,7 @@ export default {
         const result = await updateDatabase(env.DB);
         return createSuccessResponse(result);
       }},
-      { method: 'GET', path: '/rebuild', handler: async () => {
+      { method: 'POST', path: '/rebuild', handler: async () => {
         await ensureFullSettings();
         if (!await checkAuth(request, env, sys)) {
           return simpleAuthResponse();
@@ -311,24 +286,24 @@ export default {
 
   async scheduled(event, env, ctx) {
     const cron = event.cron;
-    console.log(`[Cron] 定时任务触发: ${cron}`);
+    console.debug(`[Cron] 定时任务触发: ${cron}`);
     
     if (cron === '* * 1 * *') {
-      console.log('[Cron] 开始执行每月数据清理任务（表轮换）');
+      console.debug('[Cron] 开始执行每月数据清理任务（表轮换）');
       await monthlyCleanup(env.DB);
-      console.log('[Cron] 每月数据清理任务完成');
+      console.debug('[Cron] 每月数据清理任务完成');
     } else if (cron === '* * 8 * *') {
-      console.log('[Cron] 开始执行每月8号清理旧表任务');
+      console.debug('[Cron] 开始执行每月8号清理旧表任务');
       await dropMetricsHistoryOld(env.DB);
-      console.log('[Cron] 每月8号清理旧表任务完成');
+      console.debug('[Cron] 每月8号清理旧表任务完成');
     } else if (cron === '*/1 * * * *') {
-      console.log('[Cron] 开始执行离线节点检测');
+      console.debug('[Cron] 开始执行离线节点检测');
       await checkOfflineNodes(env.DB);
-      console.log('[Cron] 离线节点检测完成');
+      console.debug('[Cron] 离线节点检测完成');
     } else if (cron === '0 12 * * *') {
-      console.log('[Cron] 开始执行服务器到期检测');
+      console.debug('[Cron] 开始执行服务器到期检测');
       await checkExpiringServers(env.DB);
-      console.log('[Cron] 服务器到期检测完成');
+      console.debug('[Cron] 服务器到期检测完成');
     }
   }
 };

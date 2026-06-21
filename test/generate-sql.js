@@ -108,12 +108,10 @@ DELETE FROM settings;
 `;
 
 const appearanceOptions = {
-  site_title: 'Cloudflare Server Monitor',
+  site_title: 'Test',
   custom_bg: 'https://cdn.nodeimage.com/i/fux0OSoFzVZQsn9uZmSDbIpKzZw2r8GW.webp',
   custom_head: '<meta content="test">',
-  custom_script: 'console.log("Hello, World!");',
-  turnstile_enabled: 'false',
-  turnstile_site_key: '0x4AAAAAADe_MND1KZql-IaB'
+  custom_script: 'console.log("Hello, World!");'
 };
 
 const siteOptions = {
@@ -124,12 +122,12 @@ const siteOptions = {
   show_tf: 'true',
   tg_notify: 'false',
   tg_bot_token: '',
-  tg_chat_id: ''
+  tg_chat_id: '',
+  turnstile_site_key: '0x4AAAAAADnx_ErgRBFcm5Il'
 };
 
 sql += `INSERT INTO settings (key, value) VALUES ('appearance_options', '${JSON.stringify(appearanceOptions)}');\n`;
 sql += `INSERT INTO settings (key, value) VALUES ('site_options', '${JSON.stringify(siteOptions)}');\n`;
-sql += `INSERT INTO settings (key, value) VALUES ('last_cleanup', '${now.toString()}');\n`;
 
 sql += `\n-- 插入服务器数据\n`;
 
